@@ -53,9 +53,7 @@ class Post(PublishedModel):
         ordering = ('-pub_date',)
 
     def get_absolute_url(self):
-        # С помощью функции reverse() возвращаем URL объекта.
-        return reverse('blog:post_detail', kwargs={'post_id': self.id}) 
-        
+        return reverse('blog:post_detail', kwargs={'post_id': self.id})
 
     def __str__(self):
         return self.title
