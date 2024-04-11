@@ -1,30 +1,21 @@
-from django.db.models.query import QuerySet
 from django.shortcuts import render, get_object_or_404, redirect
-
-from blog.models import Post, Category, Comment
-
+from django.urls import reverse_lazy, reverse
 from django.utils import timezone
 
-from django.urls import reverse_lazy, reverse
-
-from django.contrib.auth.models import User
-
-from django.views.generic import (
-    ListView, CreateView, UpdateView, DeleteView, DetailView)
-
+from blog.models import Post, Category, Comment
 from .forms import PostForm, UserForm, CommentForm
-
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-
-from django.contrib.auth.decorators import login_required
-
-from django.core.paginator import Paginator
-
-from django.db.models import Count
-
 from core.utils import filter_posts
 
-from django.http import Http404, HttpResponse
+from django.contrib.auth.models import User
+from django.views.generic import (
+    ListView, CreateView, UpdateView, DeleteView)
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db.models import Count
+from django.http import HttpResponse
+
+PAGINATE_STEP = 10
 
 
 class OnlyAuthorMixin(UserPassesTestMixin):
@@ -40,7 +31,7 @@ class IndexListView(LoginRequiredMixin, ListView):
 
     model = Post
     template_name = 'blog/index.html'
-    paginate_by = 10
+    paginate_by = PAGINATE_STEP
 
     def get_queryset(self):
         posts = Post.objects.filter(
@@ -65,31 +56,12 @@ def post_detail(request, post_id):
     if request.user == post.author:
         return render(request, template, context)
     else:
-        if post.is_published and post.pub_date < timezone.now() and category.is_published:
+        if post.is_published and post.pub_date < timezone.now()\
+                and category.is_published:
             return render(request, template, context)
         else:
             return HttpResponse('Страница не найдена', status=404)
 
-
-# class PostDetailView(ListView):
-#     template_name = 'blog/detail.html'
-#     paginate_by = 10
-
-#     def get_object(self):
-#         post = get_object_or_404(Post, pk=self.kwargs['post_id'])
-#         if self.request.user == post.author:
-#             return post
-#         return get_object_or_404(Post.objects.filter_posts_for_publication(),
-#                                  pk=self.kwargs['post_id'])
-
-#     def get_queryset(self):
-#         return self.get_object().comments.all()
-
-#     def get_context_data(self, **kwargs):
-#         context = super().get_context_data(**kwargs)
-#         context['form'] = CommentForm()
-#         context['post'] = self.get_object()
-#         return context
 
 class PostCreateView(LoginRequiredMixin, CreateView):
     """CBV для создания публикации"""
@@ -139,7 +111,7 @@ def category_posts(request, category_slug):
     category_posts = filter_posts(category.posts)
     category_posts_ext = category_posts.annotate(
         comment_count=Count('comments'))
-    paginator = Paginator(category_posts_ext, 10)
+    paginator = Paginator(category_posts_ext, PAGINATE_STEP)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {'category': category,
@@ -189,8 +161,8 @@ def comment_delete(request, post_id, comment_id):
     return render(request, 'blog/comment.html', context)
 
 
-# @login_required
 def profile_details(request, username):
+    """Функция для просмотра профиля пользователя"""
     template = 'blog/profile.html'
     profile = get_object_or_404(User, username=username)
     all_posts = profile.posts.all().order_by('-pub_date')
@@ -199,7 +171,7 @@ def profile_details(request, username):
     else:
         user_posts = filter_posts(all_posts)
     user_posts_ext = user_posts.annotate(comment_count=Count('comments'))
-    paginator = Paginator(user_posts_ext, 10)
+    paginator = Paginator(user_posts_ext, PAGINATE_STEP)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {'profile': profile,
@@ -220,77 +192,3 @@ def profile_edit(request):
         form.save()
         return redirect('blog:profile', username=request.user)
     return render(request, template, context)
-
-
-# class ProfileDetailView(DetailView):
-#     model = User
-#     form_class = UserForm
-#     template_name = 'blog/profile_detail.html'
-
-#     def get_context_data(self, **kwargs):
-#         # Получаем словарь контекста:
-#         context = super().get_context_data(**kwargs)
-#         context['page_obj'] = Post.objects.filter(author=User)
-#         return context
-
-
-# class CommentCreateView(LoginRequiredMixin, CreateView):
-#     post = None
-#     model = Comment
-#     form_class = CommentForm
-#     template_name = 'includes/comments.html'
-
-#     def dispatch(self, request, *args, **kwargs):
-#         self.birthday = get_object_or_404(Post, pk=kwargs['post_id'])
-#         return super().dispatch(request, *args, **kwargs)
-
-#     def form_valid(self, form):
-#         form.instance.author = self.request.user
-#         form.instance.post = self.post_id
-#         return super().form_valid(form)
-
-#     def get_success_url(self) -> str:
-#         return reverse('blog:post_detail', kwargs={
-#             'post_id': self.request.user.username})
-
-
-# class CommentUpdateView(OnlyAuthorMixin, UpdateView):
-#     model = Comment
-#     form_class = CommentForm
-#     template_name = 'blog/comment.html'
-
-
-# class CommentDeleteView(OnlyAuthorMixin, DeleteView):
-#     model = Comment
-#     template_name = 'blog/comment.html'
-
-# class PostDetailView(DetailView):
-#     model = Post
-#     pk_url_kwarg = 'post_id'
-#     template_name = 'blog/detail.html'
-
-#     def get_context_data(self, *args, **kwargs):
-#         context = super().get_context_data(*args, **kwargs)
-#         context['form'] = CommentForm()
-#         context['comments'] = (
-#             self.object.comments.select_related('author')
-#         )
-#         return context
-
-# class ProfileDetailView(DetailView):
-#     model = User
-#     pk_url_kwarg = 'user_name'
-#     template_name = 'blog/profile_detail.html'
-#     paginate_by = 10
-
-#     def get_queryset(self):
-#         page_obj = Post.objects.all().order_by('-pub_date')
-#         return page_obj
-
-    # def get_context_data(self, *args, **kwargs):
-    #     context = super().get_context_data(*args, **kwargs)
-    #     context['profile'] = User.objects.get(username=username)
-    #     context['comments'] = (
-    #         self.object.comments.select_related('author')
-    #     )
-    #     return context
