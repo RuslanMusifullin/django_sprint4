@@ -1,7 +1,7 @@
-x = 5
-y = 10
+def some(x, y):
+    if x == 5:
+        return 'One'
+    return (x + y)
 
-if not x == 6 or y == 7:
-    print('yes')
-else:
-    print('no')
+
+print(some(5, 2))

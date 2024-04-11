@@ -22,6 +22,10 @@ from django.core.paginator import Paginator
 
 from django.db.models import Count
 
+from core.utils import filter_posts
+
+from django.http import Http404, HttpResponse
+
 
 class OnlyAuthorMixin(UserPassesTestMixin):
     """Миксин проверки авторства объекта действий"""
@@ -51,8 +55,8 @@ def post_detail(request, post_id):
     """Функция для отображения отдельного поста"""
     template = 'blog/detail.html'
     post = get_object_or_404(Post, pk=post_id)
-    # category_id = post.category_id
-    # category = Category.objects.get(pk=category_id)
+    category_id = post.category_id
+    category = Category.objects.get(pk=category_id)
     form = CommentForm()
     comments = post.comments.all()
     context = {'post': post,
@@ -61,11 +65,31 @@ def post_detail(request, post_id):
     if request.user == post.author:
         return render(request, template, context)
     else:
-        if post.is_published and post.pub_date < timezone.now():
+        if post.is_published and post.pub_date < timezone.now() and category.is_published:
             return render(request, template, context)
         else:
-            return redirect('blog:index')
+            return HttpResponse('Страница не найдена', status=404)
 
+
+# class PostDetailView(ListView):
+#     template_name = 'blog/detail.html'
+#     paginate_by = 10
+
+#     def get_object(self):
+#         post = get_object_or_404(Post, pk=self.kwargs['post_id'])
+#         if self.request.user == post.author:
+#             return post
+#         return get_object_or_404(Post.objects.filter_posts_for_publication(),
+#                                  pk=self.kwargs['post_id'])
+
+#     def get_queryset(self):
+#         return self.get_object().comments.all()
+
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+#         context['form'] = CommentForm()
+#         context['post'] = self.get_object()
+#         return context
 
 class PostCreateView(LoginRequiredMixin, CreateView):
     """CBV для создания публикации"""
@@ -79,10 +103,10 @@ class PostCreateView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self) -> str:
         return reverse('blog:profile', kwargs={
-            'user_name': self.request.user.username})
+            'username': self.request.user.username})
 
 
-class PostUpdateView(LoginRequiredMixin, OnlyAuthorMixin, UpdateView):
+class PostUpdateView(OnlyAuthorMixin, UpdateView):
     """CBV редактирования публикации"""
 
     model = Post
@@ -97,7 +121,7 @@ class PostUpdateView(LoginRequiredMixin, OnlyAuthorMixin, UpdateView):
         )
 
 
-class PostDeleteView(LoginRequiredMixin, OnlyAuthorMixin, DeleteView):
+class PostDeleteView(OnlyAuthorMixin, DeleteView):
     """CBV удаления публикации"""
 
     model = Post
@@ -111,9 +135,8 @@ def category_posts(request, category_slug):
     """Функция для отображения категорий публикаций"""
     template = 'blog/category.html'
     category = get_object_or_404(
-        Category.objects.filter(is_published=True), slug=category_slug)
-    category_posts = category.posts.filter(
-        pub_date__lte=timezone.now(), is_published=True,).order_by('-pub_date')
+        Category, is_published=True, slug=category_slug)
+    category_posts = filter_posts(category.posts)
     category_posts_ext = category_posts.annotate(
         comment_count=Count('comments'))
     paginator = Paginator(category_posts_ext, 10)
@@ -166,11 +189,15 @@ def comment_delete(request, post_id, comment_id):
     return render(request, 'blog/comment.html', context)
 
 
-@login_required
-def profile_details(request, user_name):
-    template = 'blog/profile_detail.html'
-    profile = get_object_or_404(User, username=user_name)
-    user_posts = profile.posts.all().order_by('-pub_date')
+# @login_required
+def profile_details(request, username):
+    template = 'blog/profile.html'
+    profile = get_object_or_404(User, username=username)
+    all_posts = profile.posts.all().order_by('-pub_date')
+    if request.user == profile:
+        user_posts = all_posts
+    else:
+        user_posts = filter_posts(all_posts)
     user_posts_ext = user_posts.annotate(comment_count=Count('comments'))
     paginator = Paginator(user_posts_ext, 10)
     page_number = request.GET.get('page')
@@ -191,7 +218,7 @@ def profile_edit(request):
     context = {'form': form}
     if form.is_valid():
         form.save()
-        return redirect('blog:profile', user_name=request.user)
+        return redirect('blog:profile', username=request.user)
     return render(request, template, context)
 
 

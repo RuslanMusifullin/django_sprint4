@@ -1,9 +1,6 @@
 from django.db import models
-
 from core.models import PublishedModel
-
 from django.contrib.auth import get_user_model
-
 from django.urls import reverse
 
 TITLES_LENGTH = 256
