@@ -1,10 +1,13 @@
 from django.db import models
-from core.models import PublishedModel
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
+from core.models import PublishedModel
+
 TITLES_LENGTH = 256
+CATEGORY_LENGTH = 64
 User = get_user_model()
+DEFAULT_RELATED_NAMES_POSTS = 'posts'
 
 
 class Post(PublishedModel):
@@ -22,7 +25,7 @@ class Post(PublishedModel):
         User,
         on_delete=models.CASCADE,
         verbose_name='Автор публикации',
-        related_name='posts',
+        related_name=DEFAULT_RELATED_NAMES_POSTS,
     )
 
     location = models.ForeignKey(
@@ -31,7 +34,7 @@ class Post(PublishedModel):
         null=True,
         blank=True,
         verbose_name='Местоположение',
-        related_name='posts',
+        related_name=DEFAULT_RELATED_NAMES_POSTS,
     )
 
     category = models.ForeignKey(
@@ -39,7 +42,7 @@ class Post(PublishedModel):
         on_delete=models.SET_NULL,
         null=True,
         verbose_name='Категория',
-        related_name='posts',
+        related_name=DEFAULT_RELATED_NAMES_POSTS,
     )
 
     image = models.ImageField('Фото', upload_to='post_images', blank=True)
@@ -62,7 +65,7 @@ class Category(PublishedModel):
     title = models.CharField('Заголовок', max_length=TITLES_LENGTH)
     description = models.TextField('Описание')
     slug = models.SlugField(
-        'Идентификатор', max_length=64, unique=True,
+        'Идентификатор', max_length=CATEGORY_LENGTH, unique=True,
         help_text='Идентификатор страницы для URL; разрешены символы'
         ' латиницы, цифры, дефис и подчёркивание.'
     )
