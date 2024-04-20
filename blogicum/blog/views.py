@@ -4,14 +4,13 @@ from django.utils import timezone
 
 from blog.models import Post, Category, Comment
 from .forms import PostForm, UserForm, CommentForm
-from core.utils import filter_posts
+from core.utils import filter_posts, paginate
 
 from django.contrib.auth.models import User
 from django.views.generic import (
     ListView, CreateView, UpdateView, DeleteView)
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
 from django.db.models import Count
 from django.http import HttpResponse
 
@@ -34,9 +33,7 @@ class IndexListView(LoginRequiredMixin, ListView):
     paginate_by = PAGINATE_STEP
 
     def get_queryset(self):
-        posts = Post.objects.filter(
-            pub_date__lte=timezone.now(), is_published=True,
-            category__is_published=True).order_by('-pub_date')
+        posts = filter_posts(Post.objects)
         extended_set = posts.annotate(comment_count=Count('comments'))
         return extended_set
 
@@ -111,7 +108,7 @@ def category_posts(request, category_slug):
     category_posts = filter_posts(category.posts)
     category_posts_ext = category_posts.annotate(
         comment_count=Count('comments'))
-    paginator = Paginator(category_posts_ext, PAGINATE_STEP)
+    paginator = paginate(category_posts_ext, PAGINATE_STEP)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {'category': category,
@@ -171,7 +168,7 @@ def profile_details(request, username):
     else:
         user_posts = filter_posts(all_posts)
     user_posts_ext = user_posts.annotate(comment_count=Count('comments'))
-    paginator = Paginator(user_posts_ext, PAGINATE_STEP)
+    paginator = paginate(user_posts_ext, PAGINATE_STEP)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {'profile': profile,
